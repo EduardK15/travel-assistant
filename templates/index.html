@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Travel Assistant 2.8</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head><body><div class="wrap">
+<header class="hero"><div class="eyebrow">AI · Travel planning</div><h1>Travel Assistant 2.8</h1><p>Опиши поездку своими словами. Мы найдём предложения гостиниц через Nuitee.</p></header>
+<section class="panel"><form method="post" action="/search">
+<div class="field"><label for="query">Что ищем?</label><input id="query" name="query" value="{{ query }}" placeholder="3 самые дешёвые гостиницы в Тель-Авиве" required></div>
+<div class="chips"><button class="chip" type="button" onclick="document.getElementById('query').value='Найди 3 самые дешёвые гостиницы в Тель-Авиве'">Тель-Авив</button><button class="chip" type="button" onclick="document.getElementById('query').value='Найди 3 самые дешёвые гостиницы в Хайфе'">Хайфа</button><button class="chip" type="button" onclick="document.getElementById('query').value='Найди 3 самые дешёвые гостиницы в Эйлате'">Эйлат</button></div><div class="fields">
+<div class="field"><label for="checkin">Заселение</label><input id="checkin" type="date" name="checkin" value="{{ checkin }}" required></div>
+<div class="field"><label for="checkout">Выезд</label><input id="checkout" type="date" name="checkout" value="{{ checkout }}" required></div>
+<div class="field"><label for="adults">Взрослых гостей</label><input id="adults" type="number" name="adults" value="{{ adults }}" min="1" max="6" required></div>
+<div class="field"><label for="max_price">Максимум за проживание (₪)</label><input id="max_price" type="number" name="max_price" value="{{ max_price }}" min="1" step="1" placeholder="Без ограничения"></div>
+<div class="field"><label for="min_stars">Категория отеля</label><select id="min_stars" name="min_stars"><option value="0" {% if min_stars == 0 %}selected{% endif %}>Любая</option>{% for n in [3,4,5] %}<option value="{{ n }}" {% if min_stars == n %}selected{% endif %}>От {{ n }} звёзд</option>{% endfor %}</select></div>
+<div class="field"><label for="sort_by">Сортировать</label><select id="sort_by" name="sort_by"><option value="price" {% if sort_by == 'price' %}selected{% endif %}>Сначала дешёвые</option><option value="rating" {% if sort_by == 'rating' %}selected{% endif %}>По оценке гостей*</option></select></div>
+</div><button class="submit" type="submit">Найти гостиницы</button></form>
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+</section>
+{% if searched %}
+<div class="results-head"><h2>Найдено: {{ hotels|length }}</h2><p class="muted small">{{ city }} · {{ checkin }} — {{ checkout }} · {{ adults }} взрослых</p></div>
+{% if sandbox %}<p class="notice">Тестовая среда Nuitee: цены и доступность могут быть демонстрационными и не подходят для реального бронирования.</p>{% endif %}
+{% if sort_note %}<p class="notice">{{ sort_note }}</p>{% endif %}
+{% if not hotels %}<div class="panel"><p>Подходящих предложений не найдено. Измени даты, город или максимальную стоимость.</p></div>{% endif %}
+<div class="cards">{% for hotel in hotels %}<article class="hotel">{% if hotel.image_url %}<img class="hotel-photo" src="{{ hotel.image_url }}" alt="Фотография гостиницы {{ hotel.name }}" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">{% endif %}<div class="hotel-top"><div class="hotel-icon" aria-hidden="true">⌂</div><div><h3>{{ hotel.name }}</h3><p class="address">{{ hotel.address }}</p></div></div><div class="meta">{% if hotel.stars %}<span class="tag">★ {{ hotel.stars }} звёзд</span>{% else %}<span class="tag">Категория не указана</span>{% endif %}</div>
+<div class="bottom"><div class="price">{{ '%.2f'|format(hotel.price) }} <span class="currency">{{ hotel.currency }}</span></div><p class="note">За {{ nights }} ноч. · примерно {{ "%.2f"|format(hotel.price / nights) }} {{ hotel.currency }} за ночь</p><details class="detail"><summary>Подробнее о предложении</summary><p>Адрес: {{ hotel.address }}</p><p>Заезд: {{ checkin }} · выезд: {{ checkout }} · взрослых: {{ adults }}</p><p>Стоимость получена из API Nuitee. Это не подтверждение бронирования; налоги, сборы и условия требуют проверки.</p></details></div></article>{% endfor %}</div>
+{% endif %}
+<footer>*Оценки гостей показываются только при наличии подтверждённых данных. Пока сортировка по оценкам недоступна: применяется сортировка по цене. Фотографии показываются только при наличии прямых HTTPS-ссылок в ответе API. Каталог и цены могут быть неполными. Фильтр звёздности исключает гостиницы без указанной категории.</footer>
+</div></body></html>
