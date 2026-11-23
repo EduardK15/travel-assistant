@@ -1,14 +1,9 @@
 import os
-import sys
 from getpass import getpass
 from openai import OpenAI
 
 def secret(name, prompt):
-    value = os.getenv(name)
-    if not value:
-        if not sys.stdin.isatty():
-            raise RuntimeError(f'{name} must be configured as an environment variable on the server')
-        value = getpass(prompt)
+    value = os.getenv(name) or getpass(prompt)
     value = value.replace('\x00', '').strip()
     if not value:
         raise ValueError(f'Не задан {name}')

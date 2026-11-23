@@ -1,70 +1,36 @@
-Travel Assistant — AI-Powered Hotel Search
+# Travel Assistant 3.0 — учебное Flask-приложение
 
-A web application that helps users discover hotel offers using natural language.
+AI-интерпретация запросов о гостиницах (OpenAI) и тестовый поиск предложений Nuitee/LiteAPI. **Данные Sandbox не являются подтверждёнными бронированиями.**
 
-Built with Python, Flask, OpenAI API, and Nuitee API.
+## Локальный запуск (Pydroid 3 / Python)
 
-Features
+1. Распакуйте проект целиком, откройте `app.py` в Pydroid 3.
+2. Установите библиотеки `flask`, `openai`, `requests` (или `pip install -r requirements.txt`, если pip доступен).
+3. Запустите `app.py`. При отсутствии переменных окружения программа запросит два ключа в терминале. Не пересылайте ключи и не вставляйте их в публичные файлы.
+4. Откройте `http://127.0.0.1:5000` на том же устройстве.
 
-- Natural language search: Users can describe their hotel preferences in everyday language.
-- AI-powered request processing: OpenAI helps interpret search requests.
-- Hotel API integration: Retrieves hotel offers through Nuitee.
-- Price filtering: Supports maximum accommodation budgets.
-- Sorting: Displays hotel offers by price.
-- Hotel details: Shows hotel names, locations, prices, and available images.
-- Error handling: Handles invalid requests and external API failures.
-- Automated testing: Includes tests for important application functionality.
-- Cloud deployment: Hosted on Render.
+## Тестирование
 
-Technology Stack
+В терминале из папки проекта: `python -m unittest discover -s tests -v`.
+Тесты имитируют API и не должны расходовать средства на реальные запросы.
 
-- Python
-- Flask
-- OpenAI API
-- Nuitee API
-- REST APIs and JSON
-- HTML and CSS
-- Gunicorn
-- GitHub
-- Render
+## Развёртывание в облаке (демо)
 
-How It Works
+1. Создайте **приватный** репозиторий Git и загрузите файлы проекта, кроме секретов.
+2. На платформе с Python web service настройте установку `pip install -r requirements.txt`.
+3. Команда запуска: `gunicorn --workers 1 --bind 0.0.0.0:$PORT app:app`.
+4. В настройках сервера добавьте секретные переменные окружения `OPENAI_API_KEY` и `NUITEE_API_KEY` с действительными значениями. Никогда не помещайте их в GitHub, `render.yaml` или скриншоты.
+5. Запустите сервис и проверьте главную страницу, поиск и ошибки.
 
-1. The user enters a hotel search request.
-2. OpenAI processes the natural language input.
-3. The application prepares structured search parameters.
-4. Nuitee API provides hotel offer data.
-5. The application filters and sorts the results.
-6. Available hotels are displayed in the web interface.
+Для Render приложен `render.yaml` (Blueprint); наличие бесплатного тарифа и актуальные ограничения нужно проверить у провайдера. На других платформах используйте `Procfile` или команду выше.
 
-Project Structure
+## Ограничения безопасности и архитектуры
 
-- "app.py" — Flask application and HTTP routes
-- "ai_service.py" — OpenAI integration
-- "hotel_service.py" — Hotel search and API integration
-- "config.py" — Configuration and API credentials
-- "templates/" — HTML templates
-- "static/" — CSS and static assets
-- "tests/" — Automated tests
-- "requirements.txt" — Python dependencies
-- "Procfile" — Application startup configuration
+- **Не публикуйте этот демо-сервис для неограниченного доступа без авторизации, лимитов запросов и защиты от злоупотреблений**: запросы к OpenAI могут стоить денег.
+- Поисковые результаты хранятся **в оперативной памяти процесса** на 30 минут и исчезнут при перезапуске. Поэтому используется **один worker**; несколько workers без общего хранилища могут приводить к 404 для ссылок на результаты.
+- Используется тестовый Nuitee Sandbox. Нет реального оформления или оплаты бронирований.
+- Настройки и зависимости подготовлены для развёртывания, но фактический деплой на внешний сервер и проверка всех сценариев ещё не выполнены.
 
-Deployment
 
-The application is deployed using Render and Gunicorn.
-
-API credentials are configured through environment variables rather than being stored in the public source code.
-
-Important Notice
-
-The current Nuitee integration uses demonstration data. Displayed hotel offers and prices are not intended for real bookings.
-
-Project Status
-
-Deployed prototype — successfully tested with natural language hotel searches and hotel offer results.
-
-Author
-
-EduardK15
-
-GitHub: https://github.com/EduardK15
+## Languages (3.1)
+The interface supports English (default), Hebrew (RTL), and Russian. Use the language links at the top of the page. The selected language is passed with the search form and result URLs; UI errors are localized. Hotel names and addresses remain as provided by Nuitee. Search requests can be written in the selected language.

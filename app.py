@@ -4,6 +4,7 @@ from threading import Lock
 
 import requests
 from flask import Flask, request, render_template, redirect, url_for
+from translations import TRANSLATIONS
 from openai import APITimeoutError, APIConnectionError, RateLimitError, AuthenticationError, APIStatusError
 from ai_service import interpret
 from hotel_service import fetch_catalog, fetch_rates
@@ -14,13 +15,22 @@ RESULTS_LOCK = Lock()
 RESULT_TTL_SECONDS = 1800
 
 
+def get_lang():
+    lang = request.values.get("lang", "en")
+    return lang if lang in TRANSLATIONS else "en"
+
+
 def page(**kwargs):
     defaults = dict(query='', checkin=(date.today()+timedelta(days=14)).isoformat(),
                     checkout=(date.today()+timedelta(days=16)).isoformat(), adults=2,
                     error=None, searched=False, hotels=[], city='', sandbox=False,
                     max_price='', sort_by='price', min_stars=0, nights=1, sort_note='')
     defaults.update(kwargs)
-    return render_template('index.html', **defaults)
+    lang = get_lang()
+    if defaults.get('error_key'):
+        defaults['error'] = TRANSLATIONS[lang][defaults['error_key']]
+    defaults['sort_note'] = TRANSLATIONS[lang]['sort_note'] if defaults.get('sort_note') else ''
+    return render_template('index.html', lang=lang, t=TRANSLATIONS[lang], **defaults)
 
 
 @app.route('/')
@@ -33,7 +43,7 @@ def show_results(result_id):
     with RESULTS_LOCK:
         item = RESULTS.get(result_id)
     if not item or datetime.now().timestamp() - item['created'] > RESULT_TTL_SECONDS:
-        return page(error='Результаты устарели. Выполните поиск ещё раз.'), 404
+        return page(error_key='expired'), 404
     return page(**item['context'])
 
 
@@ -58,31 +68,31 @@ def search():
                    max_price=max_price_text, sort_by=sort_by, min_stars=min_stars)
     try:
         if not query:
-            raise ValueError('Введите запрос.')
+            raise ValueError('enter_query')
         start, end = date.fromisoformat(checkin), date.fromisoformat(checkout)
         if start < date.today() or end <= start or (end-start).days > 30:
-            raise ValueError('Проверьте даты: выезд после заезда, не более 30 ночей.')
+            raise ValueError('dates_error')
         if not 1 <= adults <= 6:
-            raise ValueError('Укажите от 1 до 6 взрослых.')
+            raise ValueError('adults_error')
         params = interpret(query)
         city = params['city'].strip()
         limit = params['limit']
         if not city:
-            raise ValueError('Укажите город.')
+            raise ValueError('city_error')
         if not isinstance(limit, int) or not 1 <= limit <= 20:
-            raise ValueError('Количество гостиниц должно быть от 1 до 20.')
+            raise ValueError('limit_error')
         if min_stars not in (0, 3, 4, 5):
-            raise ValueError('Неверная категория гостиницы.')
+            raise ValueError('stars_error')
         if sort_by not in ('price', 'rating'):
-            raise ValueError('Неверный вариант сортировки.')
+            raise ValueError('sort_error')
         budget = None
         if max_price_text:
             try:
                 budget = int(max_price_text)
             except ValueError:
-                raise ValueError('Максимальная стоимость должна быть целым числом.')
+                raise ValueError('budget_integer')
             if budget <= 0:
-                raise ValueError('Укажите бюджет больше 0 ₪ или оставьте поле пустым.')
+                raise ValueError('budget_positive')
         catalog = fetch_catalog(city)
         if catalog:
             hotels, sandbox = fetch_rates(catalog, checkin, checkout, adults)
@@ -97,8 +107,7 @@ def search():
         hotels.sort(key=lambda h: (h['currency'] != 'ILS', h['price']))
         photo_count = sum(bool(h.get('image_url')) for h in hotels[:limit])
         app.logger.warning('Hotel images found in API response: %s of %s', photo_count, min(len(hotels), limit))
-        sort_note = ('Nuitee пока не предоставил подтверждённые оценки гостей. '
-                     'Результаты отсортированы по цене.' if sort_by == 'rating' else '')
+        sort_note = bool(sort_by == 'rating')
         result_context = dict(**context, searched=True, city=city, hotels=hotels[:limit],
                               sandbox=sandbox, sort_note=sort_note, nights=(end-start).days)
         result_id = uuid4().hex
@@ -110,28 +119,28 @@ def search():
                 RESULTS.pop(key, None)
             RESULTS[result_id] = {'created': now, 'context': result_context}
         # Post/Redirect/Get: refreshing results won't resubmit the search.
-        return redirect(url_for('show_results', result_id=result_id), code=303)
+        return redirect(url_for('show_results', result_id=result_id, lang=get_lang()), code=303)
     except ValueError as exc:
-        return page(**context, error=str(exc)), 400
+        return page(**context, error_key=str(exc)), 400
     except APITimeoutError:
-        return page(**context, error='OpenAI слишком долго отвечает. Попробуйте ещё раз.'), 504
+        return page(**context, error_key='timeout_ai'), 504
     except APIConnectionError:
-        return page(**context, error='Не удалось связаться с OpenAI. Проверьте интернет и повторите попытку.'), 502
+        return page(**context, error_key='connection_ai'), 502
     except RateLimitError:
-        return page(**context, error='Достигнут лимит запросов OpenAI. Попробуйте позже.'), 429
+        return page(**context, error_key='rate_ai'), 429
     except AuthenticationError:
-        return page(**context, error='Ошибка авторизации OpenAI. Проверьте API-ключ.'), 502
+        return page(**context, error_key='auth_ai'), 502
     except APIStatusError:
-        return page(**context, error='Сервис OpenAI временно не смог обработать запрос.'), 502
+        return page(**context, error_key='status_ai'), 502
     except requests.exceptions.Timeout:
-        return page(**context, error='Nuitee не ответил вовремя. Попробуйте позже.'), 504
+        return page(**context, error_key='timeout_nuitee'), 504
     except requests.exceptions.ConnectionError:
-        return page(**context, error='Не удалось соединиться с Nuitee. Проверьте интернет и повторите попытку.'), 502
+        return page(**context, error_key='connection_nuitee'), 502
     except requests.exceptions.RequestException:
-        return page(**context, error='Ошибка соединения с Nuitee. Попробуйте позже.'), 502
+        return page(**context, error_key='request_nuitee'), 502
     except Exception:
         app.logger.error('Search failed unexpectedly (details and credentials omitted)')
-        return page(**context, error='Не удалось выполнить поиск. Попробуйте позже.'), 502
+        return page(**context, error_key='generic_error'), 502
 
 
 if __name__ == '__main__':
